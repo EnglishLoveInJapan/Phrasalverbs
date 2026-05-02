@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>語源クイズ レベル選択</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <div class="home-card">
+      <h1 class="home-title">語源クイズ</h1>
+      <p class="home-subtitle">レベルを選んでください</p>
+
+      <div class="level-grid">
+        <a class="level-button level-link" data-level="1" href="#">Basic 1 </a>
+        <a class="level-button level-link" data-level="2" href="#">Basic 2 </a>
+        <a class="level-button level-link" data-level="3" href="#">Basic 3 </a>
+        <a class="level-button level-link" data-level="4" href="#">Basic 4 </a>
+        <a class="level-button level-link" data-level="5" href="#">Basic 5 </a>
+        <a class="level-button level-link" data-level="6" href="#">語源学習1 </a>
+        <a class="level-button level-link" data-level="7" href="#">語源学習2 </a>
+        <a class="level-button level-link" data-level="8" href="#">語源学習3 </a>
+        <a class="level-button level-link" data-level="9" href="#">語源学習4 </a>
+        <a class="level-button level-link" data-level="10" href="#">そのほか 重要語句</a>
+      </div>
+
+      <div style="text-align:center; margin-top: 28px;">
+        <a href="./list-all.html" style="font-size:18px; font-weight:700;">
+          単語と語源を一覧表示
+        </a>
+      </div>
+
+      <div id="modeInfo" style="text-align:center; margin-top: 14px; font-size:14px; color:#555;"></div>
+      <div style="text-align:center; margin-top: 20px;">
+      <button type="button" id="clearAllBtn" class="restart-button">全レベルの記録を消す</button></div>
+    
+    </div>
+  </main>
+
+<script>
+  function isLiteMode() {
+    const ua = navigator.userAgent || "";
+    const isiPhone = /iPhone/i.test(ua);
+    const isAndroidPhone = /Android/i.test(ua) && /Mobile/i.test(ua);
+    return isiPhone || isAndroidPhone;
+  }
+
+  function isLevelComplete(level) {
+    return localStorage.getItem(`etymology_quiz_complete_level_${level}`) === "true";
+  }
+
+  function clearAllLevels() {
+    const ok = window.confirm("全レベルの記録を消しますか？");
+    if (!ok) return;
+
+    for (let level = 1; level <= 10; level += 1) {
+      localStorage.removeItem(`etymology_quiz_mastered_level_${level}`);
+      localStorage.removeItem(`etymology_quiz_complete_level_${level}`);
+    }
+
+    location.reload();
+  }
+
+  const liteMode = isLiteMode();
+  const pageName = liteMode ? "quiz-lite.html" : "quiz.html";
+
+  document.querySelectorAll(".level-link").forEach(link => {
+    const level = link.dataset.level;
+    const originalText = link.textContent.trim();
+
+    link.href = `./${pageName}?level=${encodeURIComponent(level)}`;
+
+    if (isLevelComplete(level)) {
+      link.textContent = `${originalText} ✅`;
+      link.classList.add("level-complete");
+    }
+  });
+
+  const clearAllBtnEl = document.getElementById("clearAllBtn");
+  if (clearAllBtnEl) {
+    clearAllBtnEl.onclick = clearAllLevels;
+  }
+
+  document.getElementById("modeInfo").textContent =
+    liteMode
+      ? "スマホ向けライト版で開きます"
+      : "iPad / PC 向け通常版で開きます";
+</script>
+</body>
+</html>
