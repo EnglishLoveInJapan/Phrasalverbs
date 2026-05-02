@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>句動詞クイズ</title>
+  <link rel="stylesheet" href="style.css?v=80">
+</head>
+
+<body>
+  <main class="container">
+
+    <div class="top-bar">
+      <div class="top-mini-buttons">
+        <button type="button" class="mini-top-button" id="finishNowBtn">結果を見る</button>
+        <button type="button" class="mini-top-button" onclick="location.href='./index.html'">トップへ戻る</button>
+        <button type="button" class="mini-top-button" id="resetNowBtn">最初から</button>
+      </div>
+
+      <div class="top-controls">
+        <div class="level-label" id="levelLabel"></div>
+      </div>
+    </div>
+
+    <div class="progress" id="progress"></div>
+    <div id="timerBar" class="timer-bar hidden"></div>
+
+    <div class="word-card">
+      <div class="word" id="word"></div>
+
+      <div class="answer-area">
+        <input
+          id="answerInput"
+          class="answer-input"
+          type="text"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="1語で入力"
+        >
+        <button id="answerBtn" class="answer-button" type="button">
+          答える
+        </button>
+      </div>
+
+      <div id="message" class="message hidden">
+        <span id="messageText"></span>
+        <button id="inlineNextBtn" class="inline-next hidden" type="button">次へ</button>
+      </div>
+    </div>
+
+    <div class="explanation hidden" id="explanation"></div>
+
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const level = params.get("level") || "1";
+
+    const levelLabelMap = {
+      "1": "Basic 1",
+      "2": "Basic 2",
+      "3": "Basic 3",
+      "4": "Basic 4",
+      "5": "Basic 5",
+      "6": "Phrasal Verbs 1",
+      "7": "Phrasal Verbs 2",
+      "8": "Phrasal Verbs 3",
+      "9": "Phrasal Verbs 4",
+      "10": "重要句動詞"
+    };
+
+    const levelLabelEl = document.getElementById("levelLabel");
+
+    if (levelLabelEl) {
+      levelLabelEl.textContent = levelLabelMap[level] || `Level ${level}`;
+    }
+
+    const allowedLevels = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+    const safeLevel = allowedLevels.includes(level) ? level : "1";
+    const stamp = Date.now();
+
+    const dataScript = document.createElement("script");
+    dataScript.src = `./data-level${safeLevel}.js?v=${stamp}`;
+
+    dataScript.onerror = function () {
+      const progressEl = document.getElementById("progress");
+      const wordEl = document.getElementById("word");
+      const answerInputEl = document.getElementById("answerInput");
+      const answerBtnEl = document.getElementById("answerBtn");
+      const timerBarEl = document.getElementById("timerBar");
+
+      if (progressEl) {
+        progressEl.textContent = "data 読み込み失敗";
+      }
+
+      if (wordEl) {
+        wordEl.textContent = `data-level${safeLevel}.js が見つかりません`;
+      }
+
+      if (answerInputEl) {
+        answerInputEl.classList.add("hidden");
+      }
+
+      if (answerBtnEl) {
+        answerBtnEl.classList.add("hidden");
+      }
+
+      if (timerBarEl) {
+        timerBarEl.classList.add("hidden");
+      }
+    };
+
+    dataScript.onload = function () {
+      const mainScript = document.createElement("script");
+      mainScript.src = `./script.js?v=${stamp}`;
+
+      mainScript.onerror = function () {
+        const progressEl = document.getElementById("progress");
+        const wordEl = document.getElementById("word");
+        const answerInputEl = document.getElementById("answerInput");
+        const answerBtnEl = document.getElementById("answerBtn");
+
+        if (progressEl) {
+          progressEl.textContent = "JS 読み込み失敗";
+        }
+
+        if (wordEl) {
+          wordEl.textContent = "script.js が見つかりません";
+        }
+
+        if (answerInputEl) {
+          answerInputEl.classList.add("hidden");
+        }
+
+        if (answerBtnEl) {
+          answerBtnEl.classList.add("hidden");
+        }
+      };
+
+      document.body.appendChild(mainScript);
+    };
+
+    document.body.appendChild(dataScript);
+  </script>
+</body>
+</html>
