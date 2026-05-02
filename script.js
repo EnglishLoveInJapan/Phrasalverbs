@@ -3,7 +3,6 @@
 // ==============================
 
 const AUTO_NEXT_MS = 4500;
-const SPEAK_LANG = "en-US";
 const TIMER_START = 5;
 const TIMER_STEP_MS = 1000;
 
@@ -15,13 +14,15 @@ const TIMER_STEP_MS = 1000;
 const progressEl = document.getElementById("progress");
 const timerBarEl = document.getElementById("timerBar");
 const wordEl = document.getElementById("word");
-const choice0El = document.getElementById("choice0");
-const choice1El = document.getElementById("choice1");
+
+const answerInputEl = document.getElementById("answerInput");
+const answerBtnEl = document.getElementById("answerBtn");
+
 const messageEl = document.getElementById("message");
 const messageTextEl = document.getElementById("messageText");
 const inlineNextBtnEl = document.getElementById("inlineNextBtn");
 const explanationEl = document.getElementById("explanation");
-const soundToggleBtnEl = document.getElementById("soundToggleBtn");
+
 const finishNowBtnEl = document.getElementById("finishNowBtn");
 const resetNowBtnEl = document.getElementById("resetNowBtn");
 
@@ -33,7 +34,6 @@ const resetNowBtnEl = document.getElementById("resetNowBtn");
 let autoNextTimer = null;
 let countdownTimer = null;
 let countdownRemaining = TIMER_START;
-let soundEnabled = false;
 
 
 // ==============================
@@ -42,8 +42,8 @@ let soundEnabled = false;
 
 const currentLevel = new URLSearchParams(window.location.search).get("level") || "1";
 
-const STORAGE_KEY = `etymology_quiz_mastered_level_${currentLevel}`;
-const COMPLETE_KEY = `etymology_quiz_complete_level_${currentLevel}`;
+const STORAGE_KEY = `phrasal_quiz_mastered_level_${currentLevel}`;
+const COMPLETE_KEY = `phrasal_quiz_complete_level_${currentLevel}`;
 
 
 // ==============================
@@ -57,6 +57,42 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+
+// ==============================
+// 入力された答えを整える関数
+// ==============================
+
+function normalizeAnswer(value) {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+
+// ==============================
+// 答えが1語かどうか確認する関数
+// ==============================
+
+function isOneWord(value) {
+  const normalized = normalizeAnswer(value);
+
+  if (normalized === "") {
+    return false;
+  }
+
+  return normalized.split(" ").length === 1;
+}
+
+
+// ==============================
+// 完成した句動詞を作る関数
+// ==============================
+
+function getCompletedPhrase(question) {
+  return String(question.word).replace("___", question.correct);
 }
 
 
@@ -101,6 +137,7 @@ function clearCountdownTimer() {
 
 function renderTimerBar() {
   if (!timerBarEl) return;
+
   timerBarEl.textContent = countdownRemaining > 0 ? String(countdownRemaining) : "";
 }
 
@@ -124,42 +161,6 @@ function startCountdown() {
       autoRevealAnswer();
     }
   }, TIMER_STEP_MS);
-}
-
-
-// ==============================
-// 音声ボタン表示更新
-// ==============================
-
-function updateSoundButton() {
-  if (!soundToggleBtnEl) return;
-
-  if (soundEnabled) {
-    soundToggleBtnEl.textContent = "音声 ON";
-    soundToggleBtnEl.classList.add("sound-on");
-  } else {
-    soundToggleBtnEl.textContent = "音声 OFF";
-    soundToggleBtnEl.classList.remove("sound-on");
-  }
-}
-
-
-// ==============================
-// 単語読み上げ
-// ==============================
-
-function speakWord(text) {
-  if (!soundEnabled) return;
-  if (!("speechSynthesis" in window)) return;
-
-  window.speechSynthesis.cancel();
-
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = SPEAK_LANG;
-  utterance.rate = 0.9;
-  utterance.pitch = 1.0;
-
-  window.speechSynthesis.speak(utterance);
 }
 
 
@@ -202,46 +203,61 @@ function clearMasteredWords() {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(COMPLETE_KEY);
   } catch (e) {
-    // 削除失敗でも処理は止めない
+    // 削除に失敗しても処理は止めない
   }
 }
 
 
 // ==============================
-// 音声ボタンの設定
+// データ確認
 // ==============================
 
-if (soundToggleBtnEl) {
-  soundToggleBtnEl.onclick = () => {
-    soundEnabled = !soundEnabled;
-    updateSoundButton();
+function hasValidQuizData() {
+  return Array.isArray(window.quizData) && window.quizData.length > 0;
+}
 
-    if (!soundEnabled && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
+function findInvalidQuestions() {
+  if (!Array.isArray(window.quizData)) return [];
 
-    if (soundEnabled && wordEl.textContent.trim()) {
-      speakWord(wordEl.textContent.trim());
-    }
-  };
+  return window.quizData.filter((q) => {
+    if (!q) return true;
+    if (!q.word) return true;
+    if (!q.sentence) return true;
+    if (!q.correct) return true;
+    if (!q.meaning) return true;
+    if (!String(q.word).includes("___")) return true;
+    if (!String(q.sentence).includes("___")) return true;
+    if (!isOneWord(q.correct)) return true;
 
-  updateSoundButton();
+    return false;
+  });
 }
 
 
 // ==============================
-// データがないときの処理
+// データがないとき・データ不備の処理
 // ==============================
 
-if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
+if (!hasValidQuizData()) {
   progressEl.textContent = "データがありません。";
   wordEl.textContent = "問題データを読み込めませんでした。";
-  choice0El.classList.add("hidden");
-  choice1El.classList.add("hidden");
 
-  if (timerBarEl) {
-    timerBarEl.classList.add("hidden");
-  }
+  if (answerInputEl) answerInputEl.classList.add("hidden");
+  if (answerBtnEl) answerBtnEl.classList.add("hidden");
+  if (timerBarEl) timerBarEl.classList.add("hidden");
+
+} else if (findInvalidQuestions().length > 0) {
+  const invalidQuestions = findInvalidQuestions();
+
+  progressEl.textContent = "データに誤りがあります。";
+  wordEl.textContent = "word / sentence / correct / meaning を確認してください。correct は必ず1語にしてください。";
+
+  if (answerInputEl) answerInputEl.classList.add("hidden");
+  if (answerBtnEl) answerBtnEl.classList.add("hidden");
+  if (timerBarEl) timerBarEl.classList.add("hidden");
+
+  console.error("不備のある問題データ:", invalidQuestions);
+
 } else {
   // =====================================
   // クイズ本体
@@ -257,7 +273,6 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
   );
 
   let currentQuestion = null;
-  let currentChoices = [];
 
 
   // ------------------------------
@@ -338,6 +353,31 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
 
 
   // ------------------------------
+  // 入力欄を有効にする
+  // ------------------------------
+
+  function enableInput() {
+    answerInputEl.disabled = false;
+    answerBtnEl.disabled = false;
+
+    answerInputEl.classList.remove("hidden");
+    answerBtnEl.classList.remove("hidden");
+
+    answerInputEl.focus();
+  }
+
+
+  // ------------------------------
+  // 入力欄を無効にする
+  // ------------------------------
+
+  function disableInput() {
+    answerInputEl.disabled = true;
+    answerBtnEl.disabled = true;
+  }
+
+
+  // ------------------------------
   // 問題表示
   // ------------------------------
 
@@ -358,22 +398,12 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
       return;
     }
 
-    currentChoices = shuffleArray(currentQuestion.choices);
-
     updateProgress();
 
-    wordEl.textContent = currentQuestion.word;
+    wordEl.textContent = currentQuestion.sentence;
 
-    speakWord(currentQuestion.word);
-
-    choice0El.textContent = currentChoices[0];
-    choice1El.textContent = currentChoices[1];
-
-    choice0El.disabled = false;
-    choice1El.disabled = false;
-
-    choice0El.classList.remove("hidden");
-    choice1El.classList.remove("hidden");
+    answerInputEl.value = "";
+    enableInput();
 
     resetMessage();
 
@@ -384,9 +414,6 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
       timerBarEl.classList.remove("hidden");
     }
 
-    choice0El.onclick = () => checkAnswer(currentChoices[0]);
-    choice1El.onclick = () => checkAnswer(currentChoices[1]);
-
     startCountdown();
   }
 
@@ -396,20 +423,22 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
   // ------------------------------
 
   function autoRevealAnswer() {
+    if (!currentQuestion) return;
+
     if (timerBarEl) {
       timerBarEl.classList.add("hidden");
     }
 
-    choice0El.disabled = true;
-    choice1El.disabled = true;
+    disableInput();
 
     messageTextEl.textContent = "";
     messageEl.classList.add("hidden");
     inlineNextBtnEl.classList.remove("hidden");
 
     explanationEl.innerHTML = `
-      <div class="answer-line">${escapeHtml(currentQuestion.word)} = ${escapeHtml(currentQuestion.correct)}</div>
-      <div class="etymology-line">${escapeHtml(currentQuestion.etymology)}</div>
+      <div class="answer-line">
+        ${escapeHtml(getCompletedPhrase(currentQuestion))} = ${escapeHtml(currentQuestion.meaning)}
+      </div>
     `;
     explanationEl.classList.remove("hidden");
 
@@ -425,18 +454,35 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
   // 解答判定
   // ------------------------------
 
-  function checkAnswer(selected) {
+  function checkAnswer(inputValue) {
+    if (!currentQuestion) return;
+
+    const userAnswer = normalizeAnswer(inputValue);
+    const correctAnswer = normalizeAnswer(currentQuestion.correct);
+
+    // 空欄または2語以上の場合
+    if (!isOneWord(userAnswer)) {
+      messageEl.classList.remove("hidden");
+      messageEl.classList.remove("message-correct");
+      messageEl.classList.add("message-wrong");
+      inlineNextBtnEl.classList.add("hidden");
+
+      messageTextEl.textContent = "答えは1語だけ入力してください。";
+
+      enableInput();
+      return;
+    }
+
     clearCountdownTimer();
 
     if (timerBarEl) {
       timerBarEl.classList.add("hidden");
     }
 
-    choice0El.disabled = true;
-    choice1El.disabled = true;
+    disableInput();
 
     // 不正解
-    if (selected !== currentQuestion.correct) {
+    if (userAnswer !== correctAnswer) {
       messageEl.classList.remove("hidden");
       messageEl.classList.remove("message-correct");
       messageEl.classList.add("message-wrong");
@@ -445,11 +491,8 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
       messageTextEl.textContent = "◾️◽️◾️◽️◾️Try again !◾️◽️◾️◽️◾️";
 
       explanationEl.innerHTML = `
-        <div class="answer-line">${escapeHtml(currentQuestion.word)} = ${escapeHtml(currentQuestion.correct)}</div>
-        <div class="etymology-line">${escapeHtml(currentQuestion.etymology)}</div>
-        <div class="example-block">
-          ${escapeHtml(currentQuestion.example1)}<br>
-          ${escapeHtml(currentQuestion.jp1)}
+        <div class="answer-line">
+          ${escapeHtml(getCompletedPhrase(currentQuestion))} = ${escapeHtml(currentQuestion.meaning)}
         </div>
       `;
       explanationEl.classList.remove("hidden");
@@ -479,12 +522,40 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
     messageTextEl.textContent = "Excellent!";
 
     explanationEl.innerHTML = `
-      <div class="answer-line">${escapeHtml(currentQuestion.word)} = ${escapeHtml(currentQuestion.correct)}</div>
+      <div class="answer-line">
+        ${escapeHtml(getCompletedPhrase(currentQuestion))} = ${escapeHtml(currentQuestion.meaning)}
+      </div>
     `;
     explanationEl.classList.remove("hidden");
 
     scheduleNext(300);
   }
+
+
+  // ------------------------------
+  // 答えるボタン
+  // ------------------------------
+
+  answerBtnEl.onclick = () => {
+    if (answerInputEl.disabled) return;
+
+    checkAnswer(answerInputEl.value);
+  };
+
+
+  // ------------------------------
+  // Return / Enter キーで答える
+  // ------------------------------
+
+  answerInputEl.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+
+    event.preventDefault();
+
+    if (answerInputEl.disabled) return;
+
+    checkAnswer(answerInputEl.value);
+  });
 
 
   // ------------------------------
@@ -494,10 +565,6 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
   function showFinalPage(isEarlyFinish) {
     clearAutoNextTimer();
     clearCountdownTimer();
-
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
 
     if (timerBarEl) {
       timerBarEl.classList.add("hidden");
@@ -509,9 +576,9 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
       return `
         <tr>
           <td>${mark}</td>
-          <td>${escapeHtml(q.word)}</td>
-          <td>${escapeHtml(q.correct)}</td>
-          <td>${escapeHtml(q.etymology)}</td>
+          <td>${escapeHtml(getCompletedPhrase(q))}</td>
+          <td>${escapeHtml(q.meaning)}</td>
+          <td>${escapeHtml(q.sentence)}</td>
         </tr>
       `;
     }).join("");
@@ -529,15 +596,15 @@ if (!Array.isArray(window.quizData) || window.quizData.length === 0) {
       <div class="progress">${summaryText}</div>
 
       <div class="final-table-wrapper">
-        <div class="final-title">このレベルの全単語一覧</div>
+        <div class="final-title">このレベルの全句動詞一覧</div>
 
         <table class="final-table">
           <thead>
             <tr>
               <th style="width: 70px;">印</th>
-              <th>単語</th>
+              <th>句動詞</th>
               <th>意味</th>
-              <th>読み方</th>
+              <th>例文</th>
             </tr>
           </thead>
           <tbody>
